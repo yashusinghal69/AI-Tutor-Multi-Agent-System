@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Tutor - Learning Assistant</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+      :root {
+        --color-bg-primary: #ffffff;
+        --color-bg-secondary: #f9fafb;
+        --color-bg-tertiary: #f3f4f6;
+        --color-text-primary: #111827;
+        --color-text-secondary: #4b5563;
+        --color-text-tertiary: #6b7280;
+        --color-border: #e5e7eb;
+        --color-accent: #3b82f6;
+        --color-accent-hover: #2563eb;
+        --color-user-bubble-bg: #3b82f6;
+        --color-user-bubble-text: #ffffff;
+        --color-ai-bubble-bg: #ffffff;
+        --color-ai-bubble-text: #111827;
+        --color-ai-bubble-hover: #f9fafb;
+        --color-user-icon: #3b82f6;
+        --color-ai-icon: #10a37f;
+        --color-error: #ef4444;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+
+      .dark {
+        --color-bg-primary: #0b0f19;
+        --color-bg-secondary: #1e293b;
+        --color-bg-tertiary: #334155;
+        --color-text-primary: #f8fafc;
+        --color-text-secondary: #e2e8f0;
+        --color-text-tertiary: #cbd5e1;
+        --color-border: #334155;
+        --color-accent: #3b82f6;
+        --color-accent-hover: #60a5fa;
+        --color-user-bubble-bg: #2563eb;
+        --color-user-bubble-text: #ffffff;
+        --color-ai-bubble-bg: #1e293b;
+        --color-ai-bubble-text: #f8fafc;
+        --color-ai-bubble-hover: #334155;
+        --color-user-icon: #3b82f6;
+        --color-ai-icon: #10a37f;
+        --color-error: #f87171;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3),
+          0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      }
+
+      body {
+        font-family: "Söhne", ui-sans-serif, system-ui, -apple-system,
+          "Segoe UI", Roboto, Ubuntu, Cantarell, sans-serif;
+        background-color: var(--color-bg-primary);
+        color: var(--color-text-primary);
+        transition: background-color 0.3s ease, color 0.3s ease;
+        overflow-x: hidden;
+      }
+
+      .message-container {
+        position: relative;
+        padding: 1.5rem 1rem;
+        transition: background-color 0.3s ease;
+      }
+
+      .message-container p,
+      .message-container div {
+        color: var(--color-text-primary);
+        transition: color 0.3s ease;
+      }
+
+      /* New ChatGPT-like styling */
+      .user-message {
+        background-color: transparent;
+      }
+
+      .assistant-message {
+        background-color: transparent;
+        transition: background-color 0.3s ease;
+      }
+
+      .assistant-message:hover {
+        background-color: var(--color-ai-bubble-hover);
+      }
+
+      .user-bubble {
+        background-color: var(--color-user-bubble-bg);
+        color: var(--color-user-bubble-text);
+        border-radius: 1.5rem;
+        border-bottom-right-radius: 0.25rem;
+        padding: 0.75rem 1.25rem;
+        max-width: 80%;
+        margin-left: auto;
+      }
+
+      .ai-bubble {
+        color: var(--color-ai-bubble-text);
+        width: 100%;
+      }
+
+      .chat-container {
+        height: calc(100vh - 64px);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .message-content {
+        max-width: 50rem;
+        margin: 0 auto;
+      }
+
+      .plotly-graph-container {
+        width: 100%;
+        height: 450px;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        margin: 1rem 0;
+        border: 1px solid var(--color-border);
+        background-color: var(--color-bg-secondary);
+      }
+
+      /* Thinking indicator animation */
+      .thinking-indicator {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 8px;
+      }
+
+      .thinking-indicator span {
+        height: 8px;
+        width: 8px;
+        margin: 0 3px;
+        background-color: var(--color-ai-icon);
+        border-radius: 50%;
+        display: inline-block;
+        opacity: 0.6;
+        animation: pulse 1.5s infinite ease-in-out;
+      }
+
+      .thinking-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .thinking-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(0.7);
+          opacity: 0.5;
+        }
+        50% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      .input-form {
+        position: sticky;
+        bottom: 0;
+        width: 100%;
+        padding: 1rem 1rem 1.5rem 1rem;
+        background: linear-gradient(
+          180deg,
+          transparent 0%,
+          var(--color-bg-primary) 50%
+        );
+      }
+
+      /* Modern input styling */
+      .input-container {
+        position: relative;
+        border-radius: 1rem;
+        background-color: var(--color-bg-secondary);
+        border: 1px solid var(--color-border);
+        box-shadow: var(--shadow-md);
+        transition: border 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .input-container:focus-within {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+      }
+
+      input[type="text"] {
+        background-color: transparent;
+        color: var(--color-text-primary);
+        border: none;
+      }
+
+      input[type="text"]:focus {
+        outline: none;
+        box-shadow: none;
+      }
+
+      /* Agent icons */
+      .user-icon {
+        background-color: var(--color-user-icon);
+      }
+
+      .ai-icon {
+        background-color: var(--color-ai-icon);
+      }
+
+      header {
+        background-color: var(--color-bg-primary);
+        border-color: var(--color-border);
+        z-index: 10;
+      }
+
+      /* Dark mode toggle */
+      .theme-switch-container {
+        position: relative;
+        width: 60px;
+        height: 30px;
+      }
+
+      .theme-switch {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .theme-switch-label {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--color-bg-tertiary);
+        border-radius: 30px;
+        transition: 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 8px;
+      }
+
+      .theme-switch-label:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        border-radius: 50%;
+        transition: 0.3s;
+      }
+
+      .theme-switch:checked + .theme-switch-label {
+        background-color: var(--color-accent);
+      }
+
+      .theme-switch:checked + .theme-switch-label:before {
+        transform: translateX(30px);
+      }
+
+      /* Quick examples */
+      .quick-examples button {
+        background-color: var(--color-bg-tertiary);
+        color: var(--color-text-primary);
+        transition: all 0.2s ease;
+        border: 1px solid var(--color-border);
+      }
+
+      .quick-examples button:hover {
+        background-color: var(--color-accent);
+        color: white;
+        transform: translateY(-1px);
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Header -->
+    <header class="border-b py-3 px-6 flex justify-between items-center">
+      <div class="flex items-center">
+        <h1 class="text-xl font-semibold flex items-center">
+          <i class="fas fa-graduation-cap text-blue-500 mr-2"></i>
+          AI Tutor
+        </h1>
+      </div>
+      <div class="flex items-center text-sm">
+        <div class="theme-switch-container mr-4">
+          <input
+            type="checkbox"
+            id="themeSwitch"
+            class="theme-switch"
+            onChange="toggleTheme()"
+          />
+          <label for="themeSwitch" class="theme-switch-label">
+            <i class="fas fa-sun text-yellow-400 text-xs"></i>
+            <i class="fas fa-moon text-blue-300 text-xs"></i>
+          </label>
+        </div>
+        <div class="mr-4 flex flex-col items-end">
+          <div class="text-xs opacity-70">
+            Session ID:
+            <span id="sessionId" class="opacity-90">Not started</span>
+          </div>
+          <div id="connectionStatus" class="text-xs text-green-500">
+            ✓ Ready
+          </div>
+        </div>
+        <button
+          id="newSessionBtn"
+          onclick="startNewSession()"
+          class="border rounded-md px-3 py-1 text-sm hover:bg-opacity-10 hover:bg-gray-700 transition-all"
+        >
+          <i class="fas fa-sync-alt mr-1"></i>New Chat
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Chat Container -->
+    <main class="chat-container">
+      <!-- Chat Messages -->
+      <div id="chatMessages" class="flex-1 overflow-y-auto">
+        <!-- Welcome Message -->
+        <div class="message-container assistant-message">
+          <div class="message-content">
+            <div class="flex">
+              <div
+                class="w-8 h-8 rounded-full text-white flex items-center justify-center mr-4 ai-icon"
+              >
+                <i class="fas fa-graduation-cap"></i>
+              </div>
+              <div class="flex-1 ai-bubble">
+                <p style="color: var(--color-text-primary)">
+                  Hi! I'm your AI Tutor. Ask me anything about math, physics, or
+                  other subjects. I have specialized tools to help you learn.
+                </p>
+                <div class="quick-examples mt-4">
+                  <p class="text-sm opacity-80 mb-2">Try asking:</p>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      onclick="setQuery('Solve: 2x + 5 = 11')"
+                      class="px-3 py-1 rounded-md text-sm transition-all"
+                    >
+                      Solve: 2x + 5 = 11
+                  </button>
+                    <button
+                      onclick="setQuery('What is Newton\'s second law?')"
+                      class="px-3 py-1 rounded-md text-sm transition-all"
+                    >
+                      Newton's second law?
+                    </button>
+                    <button
+                      onclick="setQuery('Calculate: 15 * 23 + 47')"
+                      class="px-3 py-1 rounded-md text-sm transition-all"
+                    >
+                      Calculate: 15 * 23 + 47
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Form -->
+      <div class="input-form">
+        <div class="max-w-3xl mx-auto relative">
+          <form
+            onsubmit="sendQuery(); return false;"
+            class="input-container relative"
+          >
+            <input
+              id="queryInput"
+              type="text"
+              placeholder="Ask your question here..."
+              class="w-full p-4 pr-16 rounded-lg focus:outline-none"
+              onkeypress="handleKeyPress(event)"
+            />
+            <button
+              id="sendButton"
+              type="submit"
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 rounded-full p-2 text-gray-400 hover:text-blue-500 focus:outline-none transition-colors"
+            >
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </form>
+          <p class="text-xs text-center mt-2 opacity-60">
+            AI Tutor may produce inaccurate information. Verify important
+            information.
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      let currentSessionId = null;
+
+      // Initialize the application
+      document.addEventListener("DOMContentLoaded", function () {
+        initTheme();
+        document.getElementById("queryInput").focus();
+
+        // Update the initial welcome message to use CSS variables
+        document.querySelectorAll(".message-container p").forEach((el) => {
+          el.style.color = "var(--color-text-primary)";
+        });
+
+        document.querySelectorAll(".quick-examples p").forEach((el) => {
+          el.style.color = "var(--color-text-secondary)";
+        });
+
+        document.querySelectorAll(".quick-examples button").forEach((btn) => {
+          btn.style.backgroundColor = "var(--color-bg-tertiary)";
+          btn.style.color = "var(--color-text-primary)";
+        });
+      });
+
+      // Theme handling
+      function setTheme(theme) {
+        document.documentElement.className = theme;
+        localStorage.setItem("theme", theme);
+        document.getElementById("themeSwitch").checked = theme === "dark";
+
+        // More targeted selection for welcome message text
+        document.querySelectorAll(".message-container p").forEach((el) => {
+          el.style.color = "var(--color-text-primary)";
+        });
+
+        document.querySelectorAll(".quick-examples p").forEach((el) => {
+          el.style.color = "var(--color-text-secondary)";
+        });
+
+        // Also target buttons in the welcome message
+        document.querySelectorAll(".quick-examples button").forEach((btn) => {
+          btn.style.backgroundColor = "var(--color-bg-tertiary)";
+          btn.style.color = "var(--color-text-primary)";
+          btn.style.borderColor = "var(--color-border)";
+        });
+
+        // Update Plotly theme for all graphs
+        const plots = document.querySelectorAll(".plotly-graph-container");
+        plots.forEach((plot) => {
+          if (plot._fullLayout) {
+            const newLayout = {
+              ...plot._fullLayout,
+              paper_bgcolor: theme === "dark" ? "#1e293b" : "#ffffff",
+              plot_bgcolor: theme === "dark" ? "#1e293b" : "#ffffff",
+              font: {
+                ...plot._fullLayout.font,
+                color: theme === "dark" ? "#e5e7eb" : "#111827",
+              },
+              xaxis: {
+                ...plot._fullLayout.xaxis,
+                gridcolor: theme === "dark" ? "#334155" : "#e5e7eb",
+                zerolinecolor: theme === "dark" ? "#4b5563" : "#6b7280",
+              },
+              yaxis: {
+                ...plot._fullLayout.yaxis,
+                gridcolor: theme === "dark" ? "#334155" : "#e5e7eb",
+                zerolinecolor: theme === "dark" ? "#4b5563" : "#6b7280",
+              },
+            };
+            Plotly.relayout(plot, newLayout);
+          }
+        });
+      }
+
+      function toggleTheme() {
+        const currentTheme = document.documentElement.className;
+        const newTheme = currentTheme === "dark" ? "light" : "dark";
+        setTheme(newTheme);
+      }
+
+      // Initialize theme from localStorage or system preference
+      function initTheme() {
+        const savedTheme = localStorage.getItem("theme");
+        if (savedTheme) {
+          setTheme(savedTheme);
+        } else if (
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches
+        ) {
+          setTheme("dark");
+        } else {
+          setTheme("light");
+        }
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === "Enter") {
+          sendQuery();
+        }
+      }
+
+      function setQuery(query) {
+        const input = document.getElementById("queryInput");
+        input.value = query;
+        input.focus();
+      }
+
+      function getCurrentTimestamp() {
+        const now = new Date();
+        return now.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      async function sendQuery() {
+        const input = document.getElementById("queryInput");
+        const query = input.value.trim();
+
+        if (!query) return;
+
+        // Disable input during processing
+        input.disabled = true;
+        document.getElementById("sendButton").disabled = true;
+
+        // Add user message to chat
+        addMessage("user", query);
+
+        // Show thinking indicator
+        showThinkingIndicator();
+
+        // Clear input
+        input.value = "";
+
+        try {
+          const response = await fetch("/api/query", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query: query,
+              session_id: currentSessionId,
+            }),
+          });
+
+          // Remove thinking indicator
+          hideThinkingIndicator();
+
+          const data = await response.json();
+
+          if (response.ok) {
+            currentSessionId = data.session_id;
+            document.getElementById("sessionId").textContent = currentSessionId;
+            document.getElementById("connectionStatus").className =
+              "text-xs text-green-500";
+            document.getElementById("connectionStatus").textContent =
+              "✓ Connected";
+
+            // Add assistant response
+            addMessage("assistant", data.response);
+          } else {
+            addMessage("error", `Error: ${data.detail}`);
+          }
+        } catch (error) {
+          hideThinkingIndicator();
+          addMessage("error", `Network error: ${error.message}`);
+          document.getElementById("connectionStatus").className =
+            "text-xs text-yellow-500";
+          document.getElementById("connectionStatus").textContent =
+            "⚠️ Using fallback storage";
+        }
+
+        // Re-enable input
+        input.disabled = false;
+        document.getElementById("sendButton").disabled = false;
+        input.focus();
+
+        // Scroll to bottom
+        scrollToBottom();
+      }
+
+      function showThinkingIndicator() {
+        const messagesContainer = document.getElementById("chatMessages");
+        const indicatorDiv = document.createElement("div");
+        indicatorDiv.id = "thinkingIndicator";
+        indicatorDiv.className = "message-container assistant-message";
+
+        indicatorDiv.innerHTML = `
+          <div class="message-content">
+            <div class="flex">
+              <div class="w-8 h-8 rounded-full text-white flex items-center justify-center mr-4 ai-icon">
+                <i class="fas fa-graduation-cap"></i>
+              </div>
+              <div class="flex-1">
+                <div class="thinking-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="text-xs opacity-60 ml-1 mt-1">AI Tutor is thinking...</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        messagesContainer.appendChild(indicatorDiv);
+        scrollToBottom();
+      }
+
+      function hideThinkingIndicator() {
+        const indicator = document.getElementById("thinkingIndicator");
+        if (indicator) {
+          indicator.remove();
+        }
+      }
+
+      async function startNewSession() {
+        try {
+          // Disable the button to prevent multiple clicks
+          document.getElementById("newSessionBtn").disabled = true;
+
+          // Reset session ID display
+          document.getElementById("sessionId").textContent =
+            "Creating new session...";
+
+          // Call API to create new session
+          const response = await fetch("/api/session/new", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            // Clear all previous messages
+            document.getElementById("chatMessages").innerHTML = "";
+
+            currentSessionId = data.session_id;
+            document.getElementById("sessionId").textContent = currentSessionId;
+
+            // Add welcome message with proper color handling
+            const theme = document.documentElement.className;
+
+            const welcomeDiv = document.createElement("div");
+            welcomeDiv.className = "message-container assistant-message";
+            welcomeDiv.innerHTML = `
+              <div class="message-content">
+                <div class="flex">
+                  <div class="w-8 h-8 rounded-full text-white flex items-center justify-center mr-4 ai-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                  </div>
+                  <div class="flex-1 ai-bubble">
+                    <p style="color: var(--color-text-primary)">
+                      Hi! I'm your AI Tutor. Ask me anything about math, physics, or other subjects. I have specialized tools to help you learn.
+                    </p>
+                    <div class="quick-examples mt-4">
+                      <p class="text-sm opacity-80 mb-2">Try asking:</p>
+                      <div class="flex flex-wrap gap-2">
+                        <button onclick="setQuery('Solve: 2x + 5 = 11')" class="px-3 py-1 rounded-md text-sm transition-all" style="background-color: var(--color-bg-tertiary); color: var(--color-text-primary); border-color: var(--color-border);">
+                          Solve: 2x + 5 = 11
+                        </button>
+                        <button onclick="setQuery('Graph f(x) = x^2 - 4x + 4')" class="px-3 py-1 rounded-md text-sm transition-all" style="background-color: var(--color-bg-tertiary); color: var(--color-text-primary); border-color: var(--color-border);">
+                          Graph f(x) = x^2 - 4x + 4
+                        </button>
+                        <button onclick="setQuery('What is Newton\\'s second law?')" class="px-3 py-1 rounded-md text-sm transition-all" style="background-color: var(--color-bg-tertiary); color: var(--color-text-primary); border-color: var(--color-border);">
+                          Newton's second law?
+                        </button>
+                        <button onclick="setQuery('Calculate: 15 * 23 + 47')" class="px-3 py-1 rounded-md text-sm transition-all" style="background-color: var(--color-bg-tertiary); color: var(--color-text-primary); border-color: var(--color-border);">
+                          Calculate: 15 * 23 + 47
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+
+            const messagesContainer = document.getElementById("chatMessages");
+            messagesContainer.appendChild(welcomeDiv);
+
+            // Focus on input
+            document.getElementById("queryInput").focus();
+          } else {
+            document.getElementById("sessionId").textContent =
+              "Error creating session";
+            addMessage("error", `Error: ${data.detail}`);
+          }
+        } catch (error) {
+          document.getElementById("sessionId").textContent =
+            "Error creating session";
+          addMessage("error", `Network error: ${error.message}`);
+        } finally {
+          // Re-enable the button
+          document.getElementById("newSessionBtn").disabled = false;
+        }
+      }
+
+      function addMessage(role, content) {
+        const messagesContainer = document.getElementById("chatMessages");
+        const messageDiv = document.createElement("div");
+        const timestamp = getCurrentTimestamp();
+
+        // Remove error messages if present
+        const errorElements = messagesContainer.querySelectorAll(
+          ".redis-error-message"
+        );
+        errorElements.forEach((el) => el.remove());
+
+        if (role === "user") {
+          messageDiv.className = "message-container user-message";
+          messageDiv.innerHTML = `
+            <div class="message-content">
+              <div class="flex items-start">
+                <div class="w-8 h-8 rounded-full text-white flex items-center justify-center mr-4 user-icon">
+                  <i class="fas fa-user"></i>
+                </div>
+                <div class="user-bubble">
+                  ${escapeHtml(content)}
+                </div>
+              </div>
+              <div class="text-xs opacity-60 text-right mr-4 mt-1">${timestamp}</div>
+            </div>
+          `;
+        } else if (role === "assistant") {
+          messageDiv.className = "message-container assistant-message";
+          messageDiv.innerHTML = `
+            <div class="message-content">
+              <div class="flex items-start">
+                <div class="w-8 h-8 rounded-full text-white flex items-center justify-center mr-4 ai-icon">
+                  <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div class="flex-1 ai-bubble">
+                  ${formatResponse(content)}
+                </div>
+              </div>
+              <div class="text-xs opacity-60 ml-12 mt-1">${timestamp}</div>
+            </div>
+          `;
+        } else if (role === "error") {
+          messageDiv.className = "message-container";
+          messageDiv.innerHTML = `
+            <div class="message-content">
+              <div class="py-2 px-4 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-800 dark:text-red-300">
+                ${escapeHtml(content)}
+              </div>
+              <div class="text-xs opacity-60 mt-1">${timestamp}</div>
+            </div>
+          `;
+        }
+
+        // Add to chat
+        messagesContainer.appendChild(messageDiv);
+
+        // Scroll to bottom
+        scrollToBottom();
+      }
+
+      function scrollToBottom() {
+        const messagesContainer = document.getElementById("chatMessages");
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      function formatResponse(content) {
+        // Check for plotly graphs
+        if (content.includes("<plotly-graph>")) {
+          try {
+            // Extract all graph elements
+            const plotElements = content.match(
+              /<plotly-graph>(.*?)<\/plotly-graph>/gs
+            );
+
+            if (plotElements && plotElements.length > 0) {
+              // Replace each plotly graph with a placeholder
+              let modifiedContent = content;
+
+              plotElements.forEach((plotElement, index) => {
+                const plotId = "plot-" + Date.now() + "-" + index;
+                const plotJson = plotElement
+                  .replace("<plotly-graph>", "")
+                  .replace("</plotly-graph>", "");
+
+                // Create a placeholder
+                const placeholder = `<div id="${plotId}" class="plotly-graph-container"></div>`;
+
+                // Replace the original plotly-graph tag with the placeholder
+                modifiedContent = modifiedContent.replace(
+                  plotElement,
+                  placeholder
+                );
+
+                // Schedule the rendering of the graph
+                setTimeout(() => {
+                  try {
+                    const plotData = JSON.parse(plotJson);
+                    const element = document.getElementById(plotId);
+                    if (element) {
+                      // Apply theme to the plot
+                      const isDarkMode =
+                        document.documentElement.className === "dark";
+                      if (plotData.layout) {
+                        plotData.layout.paper_bgcolor = isDarkMode
+                          ? "#1e293b"
+                          : "#ffffff";
+                        plotData.layout.plot_bgcolor = isDarkMode
+                          ? "#1e293b"
+                          : "#ffffff";
+                        plotData.layout.font = {
+                          ...plotData.layout.font,
+                          color: isDarkMode ? "#e5e7eb" : "#111827",
+                        };
+                      }
+
+                      Plotly.newPlot(element, plotData.data, plotData.layout, {
+                        responsive: true,
+                        displayModeBar: true,
+                        displaylogo: false,
+                      });
+                    }
+                  } catch (e) {
+                    console.error("Error rendering Plotly graph:", e);
+                    const element = document.getElementById(plotId);
+                    if (element) {
+                      element.innerHTML =
+                        '<div class="p-4 text-red-500">Error rendering graph</div>';
+                    }
+                  }
+                }, 100);
+              });
+
+              // Format the rest of the content
+              modifiedContent = escapeHtml(modifiedContent);
+              modifiedContent = modifiedContent.replace(
+                /\*\*(.*?)\*\*/g,
+                "<strong>$1</strong>"
+              );
+              modifiedContent = modifiedContent.replace(/\n/g, "<br>");
+
+              return modifiedContent;
+            }
+          } catch (e) {
+            console.error("Error processing Plotly graphs:", e);
+          }
+        }
+
+        // Standard formatting for text without graphs
+        content = escapeHtml(content);
+        content = content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        content = content.replace(/\n/g, "<br>");
+        return content;
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+    </script>
+  </body>
+</html>
