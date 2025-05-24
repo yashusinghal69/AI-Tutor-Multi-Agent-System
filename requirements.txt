@@ -14,3 +14,4 @@ numpy==1.26.2
 beautifulsoup4==4.12.2
 python-dotenv==1.0.0
 redis==5.0.1
+pandas==2.1.3
